@@ -103,3 +103,9 @@ npm test
 ## 📄 License
 
 MIT
+
+---
+
+## 📊 Project Report
+
+For detailed documentation, API reference, and deployment guides, see [PROJECT_REPORT.md](./PROJECT_REPORT.md)
