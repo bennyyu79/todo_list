@@ -1,12 +1,42 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { DndContext, closestCenter } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import './index.css'
 
 const API_URL = '/api/todos'
+
+const columns = {
+  todo: { title: 'To Do', color: '#ff6b6b' },
+  inprogress: { title: 'In Progress', color: '#4ecdc4' },
+  done: { title: 'Done', color: '#95e1d3' }
+}
+
+function SortableTodo({ todo }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: todo.id })
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="todo-card draggable">
+      <div className="todo-content">
+        <strong>{todo.title}</strong>
+        {todo.description && <p>{todo.description}</p>}
+        <span className={`priority-${todo.priority}`}>{todo.priority}</span>
+      </div>
+      <div className="drag-handle" title="Drag to move">🤳</div>
+    </div>
+  )
+}
 
 function App() {
   const [todos, setTodos] = useState([])
   const [newTodo, setNewTodo] = useState('')
-  const [columns, setColumns] = useState({
+  const [columnsData, setColumnsData] = useState({
     todo: [],
     inprogress: [],
     done: []
@@ -32,7 +62,7 @@ function App() {
       const col = cols[todo.status] || cols.todo
       col.push(todo)
     })
-    setColumns(cols)
+    setColumnsData(cols)
   }
 
   const addTodo = async (e) => {
@@ -69,60 +99,73 @@ function App() {
     }
   }
 
-  const moveTodo = (todo, newStatus) => {
-    updateTodo(todo.id, { status: newStatus })
+  const handleDragEnd = async (event) => {
+    const { active, over } = event
+    if (!over) return
+
+    const activeCol = Object.keys(columnsData).find(key => 
+      columnsData[key].some(todo => todo.id === active.id)
+    )
+    const overCol = Object.keys(columnsData).find(key => 
+      columnsData[key].some(todo => todo.id === over.id)
+    )
+
+    if (activeCol === overCol) {
+      const oldIndex = columnsData[activeCol].findIndex(t => t.id === active.id)
+      const newIndex = columnsData[overCol].findIndex(t => t.id === over.id)
+      
+      if (oldIndex !== newIndex) {
+        const newColumns = { ...columnsData }
+        newColumns[activeCol] = arrayMove(newColumns[activeCol], oldIndex, newIndex)
+        setColumnsData(newColumns)
+      }
+    } else {
+      const todo = columnsData[activeCol].find(t => t.id === active.id)
+      await updateTodo(todo.id, { status: overCol })
+    }
   }
 
-  const Column = ({ title, todos, status, color }) => (
-    <div className="column" style={{ borderLeft: `4px solid ${color}` }}>
-      <h3>{title} ({todos.length})</h3>
+  const Column = ({ status, todos }) => (
+    <div className="column" style={{ borderLeft: `4px solid ${columns[status].color}` }}>
+      <h3>{columns[status].title} ({todos.length})</h3>
       <div className="todo-list">
-        {todos.map(todo => (
-          <div key={todo.id} className="todo-card">
-            <div className="todo-content">
-              <strong>{todo.title}</strong>
-              {todo.description && <p>{todo.description}</p>}
-              <span className={`priority-${todo.priority}`}>
-                {todo.priority}
-              </span>
+        <SortableContext items={todos.map(t => t.id)}>
+          {todos.map(todo => (
+            <div key={todo.id} className="sortable-item">
+              <SortableTodo todo={todo} />
+              <div className="todo-actions">
+                <button onClick={() => deleteTodo(todo.id)}>×</button>
+              </div>
             </div>
-            <div className="todo-actions">
-              <select 
-                value={todo.status} 
-                onChange={(e) => moveTodo(todo, e.target.value)}
-              >
-                <option value="todo">To Do</option>
-                <option value="inprogress">In Progress</option>
-                <option value="done">Done</option>
-              </select>
-              <button onClick={() => deleteTodo(todo.id)}>×</button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </SortableContext>
       </div>
     </div>
   )
 
   return (
-    <div className="app">
-      <header>
-        <h1>📋 Todo List Kanban</h1>
-        <form onSubmit={addTodo}>
-          <input
-            type="text"
-            value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="Add a new task..."
-          />
-          <button type="submit">Add</button>
-        </form>
-      </header>
-      <div className="board">
-        <Column title="To Do" todos={columns.todo} status="todo" color="#ff6b6b" />
-        <Column title="In Progress" todos={columns.inprogress} status="inprogress" color="#4ecdc4" />
-        <Column title="Done" todos={columns.done} status="done" color="#95e1d3" />
+    <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <div className="app">
+        <header>
+          <h1>📋 Todo List Kanban</h1>
+          <p className="subtitle">Drag tasks between columns to update status</p>
+          <form onSubmit={addTodo}>
+            <input
+              type="text"
+              value={newTodo}
+              onChange={(e) => setNewTodo(e.target.value)}
+              placeholder="Add a new task..."
+            />
+            <button type="submit">Add Task</button>
+          </form>
+        </header>
+        <div className="board">
+          <Column status="todo" todos={columnsData.todo} />
+          <Column status="inprogress" todos={columnsData.inprogress} />
+          <Column status="done" todos={columnsData.done} />
+        </div>
       </div>
-    </div>
+    </DndContext>
   )
 }
 
