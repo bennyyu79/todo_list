@@ -20,7 +20,7 @@ function getAll() {
 // Get todo by ID
 function getById(id) {
   const todos = getAll();
-  return todos.find(t => t.id === id);
+  return todos.find(t => t.id === Number(id));
 }
 
 // Create a new todo
@@ -46,7 +46,7 @@ function create(data) {
 function update(id, data) {
   initDB();
   const todos = getAll();
-  const index = todos.findIndex(t => t.id === id);
+  const index = todos.findIndex(t => t.id === Number(id));
   if (index === -1) return null;
   
   todos[index] = {
@@ -66,7 +66,7 @@ function update(id, data) {
 function remove(id) {
   initDB();
   const todos = getAll();
-  const filtered = todos.filter(t => t.id !== id);
+  const filtered = todos.filter(t => t.id !== Number(id));
   fs.writeFileSync(DB_PATH, JSON.stringify(filtered, null, 2));
   return filtered.length < todos.length;
 }
