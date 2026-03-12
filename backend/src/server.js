@@ -39,10 +39,11 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Todo List Backend running on port ${PORT}`);
-  console.log(`📝 API: http://localhost:${PORT}/api/todos`);
-  console.log(`🏥 Health: http://localhost:${PORT}/health`);
+  console.log(`📝 API: http://0.0.0.0:${PORT}/api/todos`);
+  console.log(`🏥 Health: http://0.0.0.0:${PORT}/health`);
+  console.log(`🌐 Access from any network interface!`);
 });
 
 module.exports = app;
