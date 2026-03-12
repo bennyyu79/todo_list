@@ -54,7 +54,7 @@ exports.delete = (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: 'Todo not found' });
     }
-    Todo.delete(req.params.id);
+    Todo.remove(req.params.id);
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: error.message });
