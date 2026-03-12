@@ -1,56 +1,68 @@
-const { Database } = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, '../../todo.db'));
+const DATA_FILE = path.join(__dirname, '../../todos.json');
 
-// Initialize schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS todos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    description TEXT,
-    status TEXT DEFAULT 'todo',
-    priority TEXT DEFAULT 'medium',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+// Initialize data file
+if (!fs.existsSync(DATA_FILE)) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify([]));
+}
 
 const Todo = {
-  getAll: () => db.prepare('SELECT * FROM todos ORDER BY created_at DESC').all(),
+  getAll: () => {
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
   
-  getById: (id) => db.prepare('SELECT * FROM todos WHERE id = ?').get(id),
+  getById: (id) => {
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return data.find(todo => todo.id === id);
+  },
   
   create: (data) => {
-    const { title, description, status, priority } = data;
-    const stmt = db.prepare(
-      'INSERT INTO todos (title, description, status, priority) VALUES (?, ?, ?, ?)'
-    );
-    const result = stmt.run(title, description || '', status || 'todo', priority || 'medium');
-    return Todo.getById(result.lastInsertRowid);
+    const todos = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    const newTodo = {
+      id: Date.now(),
+      title: data.title,
+      description: data.description || '',
+      status: data.status || 'todo',
+      priority: data.priority || 'medium',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    todos.push(newTodo);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(todos, null, 2));
+    return newTodo;
   },
   
   update: (id, data) => {
-    const { title, description, status, priority } = data;
-    const stmt = db.prepare(`
-      UPDATE todos 
-      SET title = COALESCE(?, title),
-          description = COALESCE(?, description),
-          status = COALESCE(?, status),
-          priority = COALESCE(?, priority),
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    stmt.run(title, description, status, priority, id);
-    return Todo.getById(id);
+    const todos = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    const index = todos.findIndex(todo => todo.id === id);
+    if (index === -1) return null;
+    
+    todos[index] = {
+      ...todos[index],
+      title: data.title !== undefined ? data.title : todos[index].title,
+      description: data.description !== undefined ? data.description : todos[index].description,
+      status: data.status !== undefined ? data.status : todos[index].status,
+      priority: data.priority !== undefined ? data.priority : todos[index].priority,
+      updated_at: new Date().toISOString()
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(todos, null, 2));
+    return todos[index];
   },
   
   delete: (id) => {
-    const stmt = db.prepare('DELETE FROM todos WHERE id = ?');
-    return stmt.run(id);
+    const todos = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    const filtered = todos.filter(todo => todo.id !== id);
+    fs.writeFileSync(DATA_FILE, JSON.stringify(filtered, null, 2));
+    return true;
   },
   
-  getByStatus: (status) => db.prepare('SELECT * FROM todos WHERE status = ? ORDER BY created_at DESC').all(status)
+  getByStatus: (status) => {
+    const todos = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return todos.filter(todo => todo.status === status);
+  }
 };
 
 module.exports = Todo;
